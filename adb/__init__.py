@@ -137,8 +137,6 @@ class ScriptExecutor(QThread):
         """
         execute the current instruction
         """
-        # simulate executing...
-        # TODO 换成真正的执行，函数已经写好了
 
         self.logger.info(f"正在执行:{self.IR}")
 
@@ -285,6 +283,7 @@ class ScriptExecutor(QThread):
         self._instructionUniverseBlock()
 
     def _ocrInstruction(self):
+        # TODO 完善OCR指令
         screenshot = io.BytesIO(self.adb.get_shell_output(self.serial, "screencap", "-p"))
         x, y, w, h = self.IR["pos"]
         confidence = self.IR["confidence"]
