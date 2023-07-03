@@ -44,6 +44,20 @@ class ScriptExecutorPSW:
         self.ENABLE_INTERRUPT = True
         self.REQUIRE_SLEEP = -1
 
+    def snapshot(self):
+        return {
+            "PAUSED": self.PAUSED,
+            "FINISHED": self.FINISHED,
+            "ENABLE_INTERRUPT": self.ENABLE_INTERRUPT,
+            "REQUIRE_SLEEP": self.REQUIRE_SLEEP
+        }
+
+    def recover(self, snapshot):
+        self.PAUSED = snapshot["PAUSED"]
+        self.FINISHED = snapshot["FINISHED"]
+        self.ENABLE_INTERRUPT = snapshot["ENABLE_INTERRUPT"]
+        self.REQUIRE_SLEEP = snapshot["REQUIRE_SLEEP"]
+
 
 class ScriptExecutor(QThread):
     paused = pyqtSignal()
@@ -76,6 +90,9 @@ class ScriptExecutor(QThread):
         self.interruption = None
         # script file path
         self.scriptFile = scriptFile
+        # instruction start address
+        # todo implement this
+        self.CS = None
         # a pointer that point to the next instruction, VISIBLE to the user
         self.IP = instruction_pointer
         # a Register that save the current instruction, INVISIBLE to the user
@@ -88,6 +105,8 @@ class ScriptExecutor(QThread):
         self.serial = serial
         # adb
         self.adb = adb
+        # stack
+        self.stack = []
 
         self._globals = empty.copy()
         self._locals = empty.copy()
@@ -102,7 +121,6 @@ class ScriptExecutor(QThread):
             raise ParsedScriptFailed(e.args[0])
 
         self.IP = max(self.script.BeginAddress, self.IP)
-
 
     def _fetchInstruction(self):
         """
@@ -292,6 +310,13 @@ class ScriptExecutor(QThread):
 
         self._instructionUniverseBlock()
 
+    def _enter(self):
+        # todo 添加了上下文后，var的处理方式需要修改！来适配“全局变量”和“局部变量”
+        self.stack.append(self.snapshot())
+
+    def _return(self):
+        self.restore(self.stack.pop())
+
     # =============== PRIVATE METHODS ===============
 
     # =============== PUBLIC METHODS ===============
@@ -363,6 +388,21 @@ class ScriptExecutor(QThread):
             self.jumpTo(instructionPointer)
         self.Resume()
 
+    def snapshot(self):
+        return {
+            "IP": self.IP,
+            "PSW": self.PSW.snapshot(),
+            "globals": self._globals.copy(),
+            "locals": self._locals.copy(),
+            "interruption": self.interruption,
+        }
+
+    def restore(self, snapshot):
+        self.IP = snapshot["IP"]
+        self.PSW.recover(snapshot["PSW"])
+        self._globals = snapshot["globals"]
+        self._locals = snapshot["locals"]
+        self.interruption = snapshot["interruption"]
 
     # =============== PUBLIC METHODS ===============
 
